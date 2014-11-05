@@ -16,7 +16,7 @@ class GameState(object):
         if root:
             self.empty_slots = []
             for i in range(GameState.dim*GameState.dim):
-                self.board.append(None)
+                self.board.append(GameTile(math.floor(i/GameState.dim),i% GameState.dim, 0))
             self.set_random_tile()
             self.set_random_tile()
 
@@ -40,24 +40,20 @@ class GameState(object):
     def copy_state(self):
         child = GameState()
         for tile in self.board:
-            if tile:
                 child.board.append(GameTile(tile.x, tile.y, tile.value))
-            else:
-                child.board.append(None)
         child.update_empty_slots()
         return child
 
     def update_empty_slots(self):
         self.empty_slots = []
         for i in range(GameState.dim*GameState.dim):
-            if not self.board[i]:
+            if self.board[i].value == 0:
                 self.empty_slots.append((math.floor(i/GameState.dim),i% GameState.dim))
 
     def create_representation(self):
         representation = []
         for tile in self.board:
-            if tile:
-                representation.append(copy.deepcopy(tile))
+            representation.append(copy.deepcopy(tile))
         return representation
 
     def perform_action(self, direction):
@@ -68,13 +64,13 @@ class GameState(object):
                 i = self.calc_index(direction, row, col)
                 for c in self.calc_range2(direction, col):
                     j = self.calc_index(direction, row, c)
-                    if self.board[i] and self.board[j]:
+                    if self.board[i].value >0 and self.board[j].value>0:
                         if not combined and self.board[i] == self.board[j]:
                             self.combine(i, j)
                             combined = True
                             movement = True
                         break
-                    elif not self.board[i] and self.board[j]:
+                    elif self.board[i].value==0 and self.board[j].value>0:
                         movement = True
                         self.move(i, j, col, row, direction)
         return movement
@@ -109,7 +105,7 @@ class GameState(object):
         col = self.board[s].x
         row = self.board[s].y
         self.board[s] = GameTile(col, row, new_value)
-        self.board[t] = None
+        self.board[t] = GameTile(self.board[t].x, self.board[s].y, 0)
 
     def terminal_state(self):
         if len(self.empty_slots) > 0:
@@ -126,6 +122,8 @@ class GameState(object):
             return True
 
     def move(self, to_index, from_index, x, y, d):
+        fx = self.board[from_index].x
+        fy = self.board[from_index].y
         if d is Direction.LEFT or d is Direction.RIGHT:
             self.board[from_index].x = x
             self.board[from_index].y= y
@@ -134,7 +132,7 @@ class GameState(object):
             self.board[from_index].y= x
 
         self.board[to_index] = self.board[from_index]
-        self.board[from_index] = None
+        self.board[from_index] = GameTile(fx,fy, 0)
 
     def __repr__(self):
         representation = ""
@@ -190,22 +188,12 @@ class GameNode(Node):
         #sortedList = sorted(filter(None, self.state.board) )
         largest_value = max(value for value in self.state.board if value is not None)
         
-        # Value should appear pyramid shaped from largest value
-        # Distance from corner, center bad and corner best
-        # More open slots prefered
-        # Linear combination of these should be the heuristic.
-        #penalty = 0
-        #largest = 0
-        #if largest_value.x + largest_value.y == 0:
-        #    largest = 10*largest_value.value
-        #for value in self.state.board:
-        #    if value is not None:
-        #        penalty+= value.value *(value.x+ value.y)
-        corner = self.in_corner(largest_value)
+        corner = self.largest_in_corner(largest_value)
         empty = float(open_tiles/16)
+        monotonicity = self.monotonicity()
         #top_row = self.keep_top_row_full()
         smoothness = self.neighborhood_smoothness(largest_value)
-        score = (1600*empty) + (800*corner) + (800*smoothness)
+        score = (1000*empty) + (600*corner) + (700*monotonicity) + (300*smoothness)
         #print("------------------------------------")
         #print(self.state)
         #print("EMPTY: " + str(empty))
@@ -213,21 +201,27 @@ class GameNode(Node):
         #print("SMOOTHNESS: " + str(smoothness))
         #print("TOTAL-SCORE: " + str(score))
         #print("------------------------------------")
-        return int(score)
+        return score
+
     def monotonicity(self):
         score = 0
-        max_score = 24
+        max_score = 78
         for i in range(0, GameState.dim):
             for j in range(1, GameState.dim):
-                r = self.board.state[(GameState.dim *i) + j] 
-                d = self.board.state[(GameState.dim *j) + i]
-                
+                r = self.state.board[(GameState.dim *i) + j] 
+                d = self.state.board[(GameState.dim *j) + i]
+                if self.state.board[(GameState.dim *i) + j-1].value <= self.state.board[(GameState.dim *i) + j].value:
+                    score += j
+                if  self.state.board[(GameState.dim *j-1) + i].value <= self.state.board[(GameState.dim *j) + i].value:
+                    score += j
+        return float(score/max_score)
 
     def largest_in_corner(self, lv):
-        if lv.x = 3 and lv.y = 0:
+        if lv.x == 3 and lv.y == 3:
             return 1
         else:
             return 0
+
     def neighborhood_smoothness(self, lv):
         x = lv.x
         y = lv.y
@@ -239,15 +233,14 @@ class GameNode(Node):
             diff = 1
             if ( nx >=0 and nx <4 ) and ( ny >=0 and ny <4 ):
                 tile = self.state.board[(GameState.dim * ny) + nx]
-                if tile:
-                    value = math.log2(tile.value)
-                diff = lv.value -value
+                value = math.log2(tile.value+1)
+                diff = lv.value+1 -value
                 if diff == 0:
                     #Dont want it to be too preferred to have same valued neighbors.
                     diff = 1
         #bigger difference lead to lower score
         diff_score+= float(1/diff)
-        return diff_score/max_score
+        return float(diff_score/max_score)
 
 
 
@@ -256,22 +249,6 @@ class GameNode(Node):
             return 1
         else:
             return 0
-        
-    #def smoothness(self):
-    #    score = 0
-    #    height_map = []
-    #    for tile in self.state.board:
-    #        if tile:
-    #            height_map.append(math.log2(tile.value))
-    #        else:
-    #            height_map.append(0)
-    #
-    #    for i in range(GameState.dim):
-    #       for j in range(1, GameState.dim):
-    #            w = (i*GameState.dim) + j
-    #            h = (j*GameState.dim) +i
-    #            score += abs(height_map[w-1] -height_map[w]) +abs(height_map[h-1] - height_map[h])
-    #    return score
 
     def is_state_terminal(self):
         return self.state.terminal_state()
@@ -284,15 +261,15 @@ class GameNode(Node):
             #THere is not a large change for a 4 anyway so
             #2C branching might be excessive
             for y,x in empty_slots:
+                new_state = self.state.copy_state()
+                new_state.board[GameState.dim*y +x] = GameTile(x,y, self.state.pick_random())
+                succ.append(GameNode(new_state, parent=self))
                 #new_state = self.state.copy_state()
-                #new_state.board[GameState.dim*y +x] = GameTile(x,y, self.state.pick_random())
+                #new_state.board[GameState.dim*y +x] = GameTile(x,y,2)
                 #succ.append(GameNode(new_state, parent=self))
-                new_state = self.state.copy_state()
-                new_state.board[GameState.dim*y +x] = GameTile(x,y,2)
-                succ.append(GameNode(new_state, parent=self))
-                new_state = self.state.copy_state()
-                new_state.board[GameState.dim*y +x] = GameTile(x,y,4)
-                succ.append(GameNode(new_state, parent=self))
+                #new_state = self.state.copy_state()
+                #new_state.board[GameState.dim*y +x] = GameTile(x,y,4)
+                #succ.append(GameNode(new_state, parent=self))
         elif p is Player.MAX:
             for i in range(1, GameState.dim+1):
                 new_state = self.state.copy_state()

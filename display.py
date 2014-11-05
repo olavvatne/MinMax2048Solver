@@ -169,7 +169,8 @@ class Game2048Display(PixelDisplay):
             #print(state)
             self.delete("Piece")
             for tile in state:
-                self.draw_piece("Piece", tile.x, tile.y, tile.value)
+                if tile.value>0:
+                    self.draw_piece("Piece", tile.x, tile.y, tile.value)
 
     def draw_piece(self, piece_id, x, y, piece_type):
         self.draw_rounded(x,y, 1, 1,  Color.get(piece_type), padding=8, line=self.bg, tags=piece_id)
