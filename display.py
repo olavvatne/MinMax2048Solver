@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import ttk
 from enum import Enum
-from math import fabs
+from math import fabs, floor
 from collections import deque
 
 #Subclass of the tkinters Canvas object. Contains methods
@@ -48,7 +48,7 @@ class PixelDisplay(Canvas):
                 self.draw_model(timeslice)
 
         if not self.stopped or len(self.queue) > 0:
-            self.after(100, self.draw)
+            self.after(60, self.draw)
 
     def colorize_item(self, item, color):
         self.itemconfig(item, fill=color)
@@ -168,9 +168,11 @@ class Game2048Display(PixelDisplay):
             state = timeslice["state"]
             #print(state)
             self.delete("Piece")
-            for tile in state:
-                if tile.value>0:
-                    self.draw_piece("Piece", tile.x, tile.y, tile.value)
+            for i,tile in enumerate(state):
+                if tile>0:
+                    x = i%4
+                    y = floor(i/4)
+                    self.draw_piece("Piece", x, y, tile)
 
     def draw_piece(self, piece_id, x, y, piece_type):
         self.draw_rounded(x,y, 1, 1,  Color.get(piece_type), padding=8, line=self.bg, tags=piece_id)
