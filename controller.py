@@ -54,7 +54,7 @@ class GameController(object):
             self.send_state_snapshot()
             self.model.set_random_tile()
             self.send_state_snapshot()
-            time.sleep(0.02)
+            time.sleep(0.04)
     
     def stop_solving(self):
         self.running = False
